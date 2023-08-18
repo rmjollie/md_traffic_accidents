@@ -1,6 +1,7 @@
 library(here)
 library(rio)
 library(tidyverse)
+library(fastDummies)
 
 rstudioapi::writeRStudioPreference("data_viewer_max_columns", 100L)
 
@@ -16,17 +17,54 @@ crash_small <- crash %>% filter(YEAR>2018)
 crash_small <- crash_small %>% select(REPORT_NO, LIGHT_DESC, JUNCTION_CODE, 
                                       COLLISION_TYPE_CODE, RD_DIV_CODE,
                                       REFERENCE_ROAD_NAME, DISTANCE, FEET_MILES_FLAG, ACC_DATE)
-## drop duplicated report ids (there are 8 total)
+## drop duplicated report ids (drops 8 from the sample)
 crash_small <- crash_small %>% filter(REPORT_NO!="AE6305001S", 
                                       REPORT_NO!="BSPDA158000F", 
                                       REPORT_NO!="MCP32110012",
                                       REPORT_NO!="AE60230038")
 
+### select and modify weather
+weather_small <- weather %>% filter(YEAR>2018)
+weather_small <- weather_small %>% select(c(REPORT_NO, CONTRIB_CODE))
+weather_small <- weather_small %>% rename("weather_code" = "CONTRIB_CODE")
+weather_small <- weather_small %>% transform(weather_code=ifelse(weather_code==82.88, NA, weather_code))
+weather_mod <- weather_small %>% dummy_cols(select_columns = "weather_code", ignore_na = TRUE, remove_selected_columns = TRUE)
+
+weather_mod <- weather_mod %>% group_by(REPORT_NO) %>% summarise(weather_code_0=max(weather_code_0), 
+                                                                   weather_code_41=max(weather_code_41),
+                                                                   weather_code_42=max(weather_code_42),
+                                                                   weather_code_43=max(weather_code_43),
+                                                                   weather_code_44=max(weather_code_44),
+                                                                   weather_code_45=max(weather_code_45),
+                                                                   weather_code_46=max(weather_code_46),
+                                                                   weather_code_47=max(weather_code_47),
+                                                                   )
+
+
+
+### group_bby and then take the max of each of each column
+length(unique(weather_small$REPORT_NO))
+length((weather_mod$REPORT_NO))
+temp1 <- weather_mod %>% unique(REPORT_NO)
+
+
+weather_mod <- weather_small %>%
+  group_by(REPORT_NO) %>%
+  mutate(row_count=row_number()) %>%
+  ungroup()
+
+weather_mod <- weather_mod %>% 
+  pivot_wider(id_cols = REPORT_NO, 
+              names_from = row_count, 
+              values_from = weather_code, 
+              names_prefix = "weather_code_"
+  )
+
 
 which(colnames(crash_small)=="REPORT_NO")
-length(unique(crash_small$REPORT_NO))
+length(unique(weather_small$REPORT_NO))
 
-crash_mod <- crash_small %>%
+weather_mod <- weather_small %>%
   group_by(REPORT_NO) %>%
   mutate(row_count=row_number()) %>%
   ungroup()
