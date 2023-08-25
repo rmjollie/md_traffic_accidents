@@ -14,8 +14,8 @@ person <- import(here("data", "Maryland_Statewide_Vehicle_Crashes_-_Person_Detai
 
 ### select and modify from crash dataframe
 crash_small <- crash %>% filter(YEAR>2018)
-crash_small <- crash_small %>% select(REPORT_NO, LIGHT_DESC, JUNCTION_CODE, 
-                                      COLLISION_TYPE_CODE, RD_DIV_CODE,
+crash_small <- crash_small %>% select(REPORT_NO, LIGHT_DESC, JUNCTION_DESC, 
+                                      COLLISION_TYPE_DESC, RD_DIV_DESC,
                                       REFERENCE_ROAD_NAME, DISTANCE, FEET_MILES_FLAG, ACC_DATE)
 crash_small <- crash_small %>% distinct(REPORT_NO, .keep_all = TRUE)
 ## drop reports that are not identical, but have the same REPORT_NO, likely a mistake (there are 2 total, 4 rows)
@@ -81,10 +81,33 @@ person_mod <- person_small %>% group_by(REPORT_NO) %>% summarise(injury=max(INJ_
                                                                  bac=max(BAC_CODE),
                                                                  unsafe_equip=max(UNSAFE_EQUIP)
                                                                  )
+### select and modify vehicle
+vehicle_small <- vehicle %>% filter(YEAR>2018)
+vehicle_small <- vehicle_small %>% select(c(REPORT_NO, DAMAGE_CODE, MOVEMENT_DESC, 
+                                            VEH_YEAR, GVW_CODE, BODY_TYPE_CODE, 
+                                            DRIVERLESS_FLAG, SPEED_LIMIT, HARM_EVENT_DESC))
 
+vehicle_small <- vehicle_small %>% mutate(ANY_DAMAGE=ifelse(DAMAGE_CODE>1&DAMAGE_CODE<88,1,0),
+                                          WEIGHT=case_when(GVW_CODE==1 ~ 1L,
+                                                           GVW_CODE==2 ~ 2L,
+                                                           GVW_CODE==3 ~3L,
+                                                           T ~ NA_integer_),
+                                          DAMAGE_SEVER=case_when(DAMAGE_CODE==1~1L,
+                                                                 DAMAGE_CODE==2~2L,
+                                                                 DAMAGE_CODE==3~3L,
+                                                                 DAMAGE_CODE==4~4L,
+                                                                 DAMAGE_CODE==5~5L,
+                                                                 T~NA_integer_),
+                                          )
+vehicle_mod <- vehicle_small %>% group_by(REPORT_NO) %>% summarise(damage=max(DAMAGE_SEVER),
+                                                                   damage_count=sum(ANY_DAMAGE),
+                                                                   vehicle_count=n(),
+                                                                   speed_limit=max(SPEED_LIMIT),
+                                                                   )
 
+### merge dataframes
+df_list <- list(crash_small, person_mod, vehicle_mod, weather_mod, road_mod)
+crash_df <- df_list %>% reduce(full_join, by="REPORT_NO")
 
-length(unique(road_small$REPORT_NO))
-length((road_mod$REPORT_NO))
-temp <- road_small %>% filter(road_code==62)
-temp1 <- road_mod %>% filter(road_code_62==1)
+### modify crash_df
+
