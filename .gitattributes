@@ -1,0 +1,2 @@
+clean_crash_data.csv filter=lfs diff=lfs merge=lfs -text
+data/clean_crash_data.csv filter=lfs diff=lfs merge=lfs -text
